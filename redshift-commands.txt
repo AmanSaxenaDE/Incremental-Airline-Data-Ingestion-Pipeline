@@ -1,0 +1,33 @@
+create database airline_analytics
+create schema flights;
+CREATE TABLE flights.daily_flights_processed (
+    carrier VARCHAR(10),
+    departure_airport VARCHAR(200),
+    arrival_airport VARCHAR(200),
+    departure_city VARCHAR(100),
+    arrival_city VARCHAR(100),
+    departure_state VARCHAR(100),
+    arrival_state VARCHAR(100),
+    departure_delay BIGINT,
+    arrival_delay BIGINT,
+    departure_airport_code BIGINT,
+    arrival_airport_code BIGINT
+);
+
+CREATE TABLE flights.airport_codes (
+    airport_id BIGINT,
+    city VARCHAR(100),
+    state VARCHAR(100),
+    name VARCHAR(200)
+);
+
+COPY flights.airport_codes
+FROM 's3://airlines-data-raw/airport-codes/airports.csv' 
+IAM_ROLE 'arn:aws:iam::xxxxxxxx:role/service-role/AmazonRedshift-Role'
+DELIMITER ','
+IGNOREHEADER 1
+REGION 'eu-north-1';
+
+select * from flights.airport_codes limit 10;
+
+select count(*) from flights.daily_flights_processed;

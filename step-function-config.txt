@@ -1,0 +1,82 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Start-S3-Daily-Flights-Raw-Crawler",
+  "States": {
+    "Start-S3-Daily-Flights-Raw-Crawler": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "s3_daily_flights_raw_crawler"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Next": "Get-Crawler-Status"
+    },
+    "Get-Crawler-Status": {
+      "Type": "Task",
+      "Arguments": {
+        "Name": "s3_daily_flights_raw_crawler"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Output": {
+        "CrawlerState": "{% $states.result.Crawler.State %}"
+      },
+      "Next": "Check-And-Wait"
+    },
+    "Check-And-Wait": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Wait-If-Crawler-Is-Running",
+          "Condition": "{% $states.input.CrawlerState ='RUNNING' %}"
+        }
+      ],
+      "Default": "Glue StartJobRun"
+    },
+    "Wait-If-Crawler-Is-Running": {
+      "Type": "Wait",
+      "Seconds": 15,
+      "Next": "Get-Crawler-Status"
+    },
+    "Glue StartJobRun": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Arguments": {
+        "JobName": "Event-Driven-Flights-Incremental-Processing-ETL"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "Next": "Glue-Job-Failure-Notification"
+        }
+      ],
+      "Next": "Glue-Job-Success-Notification"
+    },
+    "Glue-Job-Success-Notification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Arguments": {
+        "TopicArn": "arn:aws:sns:eu-north-1:XXXXXXXXX:notification",
+        "Message": {
+          "Job": "Event-Driven-Flights-Incremental-Processing ETL",
+          "Status": "Success"
+        }
+      },
+      "End": true
+    },
+    "Glue-Job-Failure-Notification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Arguments": {
+        "TopicArn": "arn:aws:sns:eu-north-1:XXXXXXXXX:notification",
+        "Message": {
+          "Job": "Event-Driven-Flights-Incremental-Processing ETL",
+          "Status": "Failed",
+          "Error": "{% $states %}"
+        }
+      },
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
